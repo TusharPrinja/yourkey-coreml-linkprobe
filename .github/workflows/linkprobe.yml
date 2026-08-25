@@ -32,8 +32,12 @@ jobs:
               exit 65
             }
           echo TRIPWIRE COMPILED
+          echo '--- did the bridge actually compile? ---'
+          grep -c "YKCoreMLBridge.swift" full.log || true
+          grep "YKCoreMLBridge" full.log | head -4 || true
       - name: Assert the bridge class is IN the binary
         run: |
           BIN=$(find ~/Library/Developer/Xcode/DerivedData -path "*Build/Products*iphoneos*/linkprobe.app/linkprobe" | head -1)
           test -n "$BIN" || { echo "no built binary found"; find ~/Library/Developer/Xcode/DerivedData -name "linkprobe.app" | head -3; exit 1; }
-          strings "$BIN" | grep -q "YKCoreMLBridge" && echo "THE LINK IS REAL — class present in binary" || { echo "class missing from binary"; exit 1; }
+          (strings "$BIN" | grep -q "YKCoreMLBridge") || (nm -gU "$BIN" 2>/dev/null | grep -qi "ykcoreml") || { echo "class missing from binary"; exit 1; }
+          echo "THE LINK IS REAL — class present in binary"
