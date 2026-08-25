@@ -1,0 +1,31 @@
+name: linkprobe
+on: [push, workflow_dispatch]
+jobs:
+  prove:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: Xcode 16
+        run: sudo xcode-select -s /Applications/Xcode_16.4.app || true
+      - name: Install JS deps
+        run: npm install --no-audit --no-fund
+      - name: Prebuild (config plugins + autolinked local module)
+        run: npx expo prebuild --platform ios --no-install
+      - name: Pod install (spm_dependency resolves here)
+        run: cd ios && pod install
+      - name: Assert the package reached the POD target
+        run: |
+          grep -q "CoreML-LLM" ios/Pods/Pods.xcodeproj/project.pbxproj && echo "package reference present in Pods project" || { echo "NO package reference in Pods project"; exit 1; }
+      - name: Unsigned build — the tripwire must compile
+        run: |
+          set -o pipefail
+          cd ios
+          xcodebuild -workspace linkprobe.xcworkspace -scheme linkprobe \
+            -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO build > full.log 2>&1 || {
+              echo '=== ERRORS ==='
+              grep -E "error:" full.log | sort | uniq -c | sort -rn | head -40
+              exit 65
+            }
+          echo TRIPWIRE COMPILED — THE LINK IS REAL
