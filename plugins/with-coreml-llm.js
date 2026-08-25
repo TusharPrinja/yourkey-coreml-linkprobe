@@ -59,20 +59,19 @@ module.exports = function withCoreMLLLM(config) {
       objects.PBXFileReference[fileRef] = {
         isa: 'PBXFileReference',
         lastKnownFileType: 'sourcecode.swift',
-        path: BRIDGE,
+        // App-relative path on the MAIN group: resolves correctly no matter
+        // how the template names its inner groups (the v3 lesson — a named
+        // group search missed, and the file resolved to ios/ instead).
+        path: `${appName}/${BRIDGE}`,
         sourceTree: '"<group>"',
       };
       objects.PBXFileReference[`${fileRef}_comment`] = BRIDGE;
       objects.PBXBuildFile[buildFile] = { isa: 'PBXBuildFile', fileRef, fileRef_comment: BRIDGE };
       objects.PBXBuildFile[`${buildFile}_comment`] = `${BRIDGE} in Sources`;
-      for (const [key, group] of Object.entries(objects.PBXGroup)) {
-        if (key.endsWith('_comment') || !group) continue;
-        if (group.name === appName || group.path === appName || group.path === `"${appName}"`) {
-          group.children = group.children || [];
-          group.children.push({ value: fileRef, comment: BRIDGE });
-          break;
-        }
-      }
+      const mainGroupId = project.getFirstProject().firstProject.mainGroup;
+      const mainGroup = objects.PBXGroup[mainGroupId];
+      mainGroup.children = mainGroup.children || [];
+      mainGroup.children.push({ value: fileRef, comment: BRIDGE });
       const targetKey = project.getFirstTarget().uuid;
       const target = objects.PBXNativeTarget[targetKey];
       for (const ph of target.buildPhases ?? []) {
