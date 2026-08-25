@@ -39,5 +39,10 @@ jobs:
         run: |
           BIN=$(find ~/Library/Developer/Xcode/DerivedData -path "*Build/Products*iphoneos*/linkprobe.app/linkprobe" | head -1)
           test -n "$BIN" || { echo "no built binary found"; find ~/Library/Developer/Xcode/DerivedData -name "linkprobe.app" | head -3; exit 1; }
-          (strings "$BIN" | grep -q "YKCoreMLBridge") || (nm -gU "$BIN" 2>/dev/null | grep -qi "ykcoreml") || { echo "class missing from binary"; exit 1; }
+          echo "binary: $BIN"; ls -la "$(dirname "$BIN")" | head -8
+          echo '--- objc classes in binary ---'
+          nm "$BIN" 2>/dev/null | grep -i "objc_class" | head -6 || true
+          echo '--- object files carrying the bridge ---'
+          find ~/Library/Developer/Xcode/DerivedData -name "*.o" -path "*linkprobe*" 2>/dev/null | xargs grep -l "YKCoreMLBridge" 2>/dev/null | head -4 || true
+          (strings "$BIN" | grep -q "YKCoreMLBridge") || (nm "$BIN" 2>/dev/null | grep -qi "ykcoreml") || { echo "class missing from binary"; exit 1; }
           echo "THE LINK IS REAL — class present in binary"
