@@ -1,0 +1,2 @@
+The production bridge guards with canImport; the tripwire below keeps the
+unconditional-import proof alive.

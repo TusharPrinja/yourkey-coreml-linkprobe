@@ -26,7 +26,7 @@ jobs:
           set -o pipefail
           cd ios
           xcodebuild -workspace linkprobe.xcworkspace -scheme linkprobe \
-            -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO build > full.log 2>&1 || {
+            -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO ENABLE_DEBUG_DYLIB=NO build > full.log 2>&1 || {
               echo '=== ERRORS ==='
               grep -E "error:" full.log | sort | uniq -c | sort -rn | head -40
               exit 65

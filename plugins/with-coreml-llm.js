@@ -10,14 +10,16 @@ const PKG_URL = 'https://github.com/TusharPrinja/CoreML-LLM';
 const PKG_BRANCH = 'main';
 const PKG_PRODUCT = 'CoreMLLLM';
 const BRIDGE = 'YKCoreMLBridge.swift';
+const TRIPWIRE = 'YKLinkTripwire.swift';
 
 module.exports = function withCoreMLLLM(config) {
   // 1. Copy the bridge source into the generated app directory.
   config = withDangerousMod(config, ['ios', (cfg) => {
     const appName = cfg.modRequest.projectName;
-    const src = path.join(cfg.modRequest.projectRoot, 'native', BRIDGE);
-    const dst = path.join(cfg.modRequest.platformProjectRoot, appName, BRIDGE);
-    fs.copyFileSync(src, dst);
+    for (const f of [BRIDGE, TRIPWIRE]) {
+      const src = path.join(cfg.modRequest.projectRoot, 'native', f);
+      if (fs.existsSync(src)) fs.copyFileSync(src, path.join(cfg.modRequest.platformProjectRoot, appName, f));
+    }
     return cfg;
   }]);
 
@@ -53,36 +55,35 @@ module.exports = function withCoreMLLLM(config) {
       target.packageProductDependencies.push({ value: depUuid, comment: PKG_PRODUCT });
     }
 
-    if (!JSON.stringify(project.hash).includes(BRIDGE)) {
+    const addSource = (fileName) => {
       const fileRef = project.generateUuid();
       const buildFile = project.generateUuid();
       objects.PBXFileReference[fileRef] = {
         isa: 'PBXFileReference',
         lastKnownFileType: 'sourcecode.swift',
-        // App-relative path on the MAIN group: resolves correctly no matter
-        // how the template names its inner groups (the v3 lesson — a named
-        // group search missed, and the file resolved to ios/ instead).
-        path: `${appName}/${BRIDGE}`,
+        path: `${appName}/${fileName}`,
         sourceTree: '"<group>"',
       };
-      objects.PBXFileReference[`${fileRef}_comment`] = BRIDGE;
-      objects.PBXBuildFile[buildFile] = { isa: 'PBXBuildFile', fileRef, fileRef_comment: BRIDGE };
-      objects.PBXBuildFile[`${buildFile}_comment`] = `${BRIDGE} in Sources`;
+      objects.PBXFileReference[`${fileRef}_comment`] = fileName;
+      objects.PBXBuildFile[buildFile] = { isa: 'PBXBuildFile', fileRef, fileRef_comment: fileName };
+      objects.PBXBuildFile[`${buildFile}_comment`] = `${fileName} in Sources`;
       const mainGroupId = project.getFirstProject().firstProject.mainGroup;
       const mainGroup = objects.PBXGroup[mainGroupId];
       mainGroup.children = mainGroup.children || [];
-      mainGroup.children.push({ value: fileRef, comment: BRIDGE });
+      mainGroup.children.push({ value: fileRef, comment: fileName });
       const targetKey = project.getFirstTarget().uuid;
       const target = objects.PBXNativeTarget[targetKey];
       for (const ph of target.buildPhases ?? []) {
         const phase = objects.PBXSourcesBuildPhase[ph.value];
         if (phase) {
           phase.files = phase.files || [];
-          phase.files.push({ value: buildFile, comment: `${BRIDGE} in Sources` });
+          phase.files.push({ value: buildFile, comment: `${fileName} in Sources` });
           break;
         }
       }
-    }
+    };
+    if (!JSON.stringify(project.hash).includes(TRIPWIRE)) addSource(TRIPWIRE);
+    if (!JSON.stringify(project.hash).includes(BRIDGE)) addSource(BRIDGE);
     return cfg;
   });
 };
