@@ -11,17 +11,16 @@ jobs:
         run: sudo xcode-select -s /Applications/Xcode_16.4.app || true
       - name: Install JS deps
         run: npm install --no-audit --no-fund
-      - name: Prebuild (config plugins + autolinked local module)
+      - name: Prebuild (plugin copies the bridge + adds the package)
         run: npx expo prebuild --platform ios --no-install
-      - name: CocoaPods with spm_dependency (1.16+)
+      - name: Assert the bridge + package reached the APP project
         run: |
-          sudo gem install cocoapods --no-document
-          pod --version
-      - name: Pod install (spm_dependency resolves here)
+          grep -q "CoreML-LLM" ios/*.xcodeproj/project.pbxproj || { echo "NO package ref in app project"; exit 1; }
+          grep -q "YKCoreMLBridge.swift" ios/*.xcodeproj/project.pbxproj || { echo "NO bridge in app project"; exit 1; }
+          test -f ios/linkprobe/YKCoreMLBridge.swift || { echo "bridge file not copied"; exit 1; }
+          echo "bridge + package present in app project"
+      - name: Pod install
         run: cd ios && pod install
-      - name: Assert the package reached the POD target
-        run: |
-          grep -q "CoreML-LLM" ios/Pods/Pods.xcodeproj/project.pbxproj && echo "package reference present in Pods project" || { echo "NO package reference in Pods project"; exit 1; }
       - name: Unsigned build — the tripwire must compile
         run: |
           set -o pipefail
@@ -32,4 +31,9 @@ jobs:
               grep -E "error:" full.log | sort | uniq -c | sort -rn | head -40
               exit 65
             }
-          echo TRIPWIRE COMPILED — THE LINK IS REAL
+          echo TRIPWIRE COMPILED
+      - name: Assert the bridge class is IN the binary
+        run: |
+          BIN=$(find ~/Library/Developer/Xcode/DerivedData -path "*Build/Products*iphoneos*/linkprobe.app/linkprobe" | head -1)
+          test -n "$BIN" || { echo "no built binary found"; find ~/Library/Developer/Xcode/DerivedData -name "linkprobe.app" | head -3; exit 1; }
+          strings "$BIN" | grep -q "YKCoreMLBridge" && echo "THE LINK IS REAL — class present in binary" || { echo "class missing from binary"; exit 1; }
