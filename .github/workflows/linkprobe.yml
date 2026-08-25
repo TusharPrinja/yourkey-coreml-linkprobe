@@ -13,6 +13,10 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Prebuild (config plugins + autolinked local module)
         run: npx expo prebuild --platform ios --no-install
+      - name: CocoaPods with spm_dependency (1.16+)
+        run: |
+          sudo gem install cocoapods --no-document
+          pod --version
       - name: Pod install (spm_dependency resolves here)
         run: cd ios && pod install
       - name: Assert the package reached the POD target
